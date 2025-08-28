@@ -1,0 +1,247 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Secret Calculator</title>
+    <style>
+        body {
+            font-family: monospace;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        h1 {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        textarea {
+            width: 100%;
+            height: 300px;
+            padding: 15px;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        
+        button {
+            background: #007bff;
+            color: white;
+            padding: 15px 30px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px 5px;
+        }
+        
+        button:hover {
+            background: #0056b3;
+        }
+        
+        .result {
+            margin-top: 20px;
+            padding: 20px;
+            background: #e8f5e8;
+            border-radius: 5px;
+            font-size: 18px;
+            font-weight: bold;
+            text-align: center;
+        }
+        
+        .error {
+            background: #ffe8e8;
+            color: #d00;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Secret Calculator</h1>
+        
+        <textarea id="jsonInput" placeholder="Paste JSON here..."></textarea>
+        
+        <div style="text-align: center;">
+            <button onclick="calculate()">Calculate Secret</button>
+            <button onclick="loadTest1()">Test 1</button>
+            <button onclick="loadTest2()">Test 2</button>
+        </div>
+        
+        <div id="result"></div>
+    </div>
+
+    <script>
+        // Convert number from any base to decimal (BigInt for large numbers)
+        function baseToDecimal(value, base) {
+            let result = 0n;
+            const baseValue = BigInt(base);
+            const digits = value.toLowerCase();
+            
+            for (let i = 0; i < digits.length; i++) {
+                const digit = digits[i];
+                let digitValue;
+                
+                if (digit >= '0' && digit <= '9') {
+                    digitValue = BigInt(digit.charCodeAt(0) - '0'.charCodeAt(0));
+                } else if (digit >= 'a' && digit <= 'z') {
+                    digitValue = BigInt(digit.charCodeAt(0) - 'a'.charCodeAt(0) + 10);
+                } else {
+                    throw new Error(`Invalid digit '${digit}'`);
+                }
+                
+                result = result * baseValue + digitValue;
+            }
+            
+            return result;
+        }
+
+        // Lagrange interpolation at x = 0
+        function findSecret(points) {
+            const n = points.length;
+            let result = 0n;
+            
+            for (let i = 0; i < n; i++) {
+                let xi = BigInt(points[i].x);
+                let yi = points[i].y;
+                
+                let numerator = 1n;
+                let denominator = 1n;
+                
+                for (let j = 0; j < n; j++) {
+                    if (i !== j) {
+                        let xj = BigInt(points[j].x);
+                        numerator *= (-xj);
+                        denominator *= (xi - xj);
+                    }
+                }
+                
+                result += yi * numerator / denominator;
+            }
+            
+            return result.toString();
+        }
+
+        function calculate() {
+            const input = document.getElementById('jsonInput').value.trim();
+            const resultDiv = document.getElementById('result');
+            
+            try {
+                const data = JSON.parse(input);
+                const k = data.keys.k;
+                
+                // Extract and decode points
+                const points = [];
+                for (const key in data) {
+                    if (key !== 'keys') {
+                        const x = parseInt(key);
+                        const base = data[key].base;
+                        const encodedValue = data[key].value;
+                        const y = baseToDecimal(encodedValue, base);
+                        points.push({ x, y });
+                    }
+                }
+                
+                // Sort and take first k points
+                points.sort((a, b) => a.x - b.x);
+                const selectedPoints = points.slice(0, k);
+                
+                // Calculate secret
+                const secret = findSecret(selectedPoints);
+                
+                resultDiv.innerHTML = `<div class="result">SECRET: ${secret}</div>`;
+                
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="result error">Error: ${error.message}</div>`;
+            }
+        }
+
+        function loadTest1() {
+            document.getElementById('jsonInput').value = `{
+    "keys": {
+        "n": 4,
+        "k": 3
+    },
+    "1": {
+        "base": "10",
+        "value": "4"
+    },
+    "2": {
+        "base": "2",
+        "value": "111"
+    },
+    "3": {
+        "base": "10",
+        "value": "12"
+    },
+    "6": {
+        "base": "4",
+        "value": "213"
+    }
+}`;
+        }
+
+        function loadTest2() {
+            document.getElementById('jsonInput').value = `{
+    "keys": {
+        "n": 10,
+        "k": 7
+    },
+    "1": {
+        "base": "6",
+        "value": "13444211440455345511"
+    },
+    "2": {
+        "base": "15",
+        "value": "aed7015a346d63"
+    },
+    "3": {
+        "base": "15",
+        "value": "6aeeb69631c227c"
+    },
+    "4": {
+        "base": "16",
+        "value": "e1b5e05623d881f"
+    },
+    "5": {
+        "base": "8",
+        "value": "316034514573652620673"
+    },
+    "6": {
+        "base": "3",
+        "value": "2122212201122002221120200210011020220200"
+    },
+    "7": {
+        "base": "3",
+        "value": "20120221122211000100210021102001201112121"
+    },
+    "8": {
+        "base": "6",
+        "value": "20220554335330240002224253"
+    },
+    "9": {
+        "base": "12",
+        "value": "45153788322a1255483"
+    },
+    "10": {
+        "base": "7",
+        "value": "1101613130313526312514143"
+    }
+}`;
+        }
+    </script>
+</body>
+</html>
+index.html
+Displaying index.html.
